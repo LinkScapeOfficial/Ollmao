@@ -7,13 +7,17 @@ actor OllamaService {
     private init() {}
     
     private func formatContext(_ messages: [ChatMessage]) -> String {
-        messages.map { message in
+        let intro = "You are a helpful assistant, these are the content conversation the user discussed with assistant before.\n\n"
+        
+        let history = messages.map { message in
             switch message.role {
                 case .user: return "Human: \(message.content)"
                 case .assistant: return "Assistant: \(message.content)"
                 case .system: return "System: \(message.content)"
             }
-        }.joined(separator: "\n\n")
+        }.joined(separator: "\n")
+        
+        return intro + history + "\n\nnow here is the new human prompt, please reply\n"
     }
     
     private func cleanResponse(_ response: String) -> String {
@@ -31,8 +35,13 @@ actor OllamaService {
         }
         
         // Include previous messages in the prompt
-        let context = messages.isEmpty ? "" : formatContext(messages) + "\n\n"
-        let fullPrompt = context + "Human: " + prompt + "\n\nAssistant:"
+        let context = messages.isEmpty ? "" : formatContext(messages)
+        let fullPrompt = context + "Human: " + prompt
+        
+        print("Full prompt being sent:")
+        print("---START OF PROMPT---")
+        print(fullPrompt)
+        print("---END OF PROMPT---")
         
         let body: [String: Any] = [
             "model": model,
@@ -40,14 +49,13 @@ actor OllamaService {
             "stream": true
         ]
         
-        print("Sending request to Ollama with body: \(body)")
-        let jsonData = try JSONSerialization.data(withJSONObject: body, options: .prettyPrinted)
-        print("Request JSON: \(String(data: jsonData, encoding: .utf8) ?? "")")
-        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = jsonData
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        print("Sending request to Ollama with body: \(body)")
+        print("Request JSON: \(String(data: request.httpBody ?? Data(), encoding: .utf8) ?? "")")
         
         return AsyncThrowingStream { continuation in
             Task {
@@ -64,7 +72,6 @@ actor OllamaService {
                     if !(200...299).contains(httpResponse.statusCode) {
                         var errorMessage = "HTTP Error \(httpResponse.statusCode)"
                         for try await line in stream.lines {
-                            print("Error response line: \(line)")
                             if let data = line.data(using: .utf8),
                                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                                let error = json["error"] as? String {
