@@ -31,4 +31,4 @@ This project is built with:
 
 ## License
 
-MIT License
+[GPL-3.0 License](LICENSE)
