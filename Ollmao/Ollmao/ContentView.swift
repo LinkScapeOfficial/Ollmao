@@ -82,6 +82,19 @@ struct ContentView: View {
                     
                     // Input area
                     HStack(spacing: 12) {
+                        if viewModel.availableModels.isEmpty {
+                            ProgressView()
+                                .padding(.horizontal)
+                        } else {
+                            Picker("Model", selection: $viewModel.selectedModel) {
+                                ForEach(viewModel.availableModels, id: \.self) { model in
+                                    Text(model).tag(model)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .padding(.horizontal)
+                        }
+                        
                         TextField("Type your message...", text: $viewModel.inputMessage, axis: .vertical)
                             .textFieldStyle(.plain)
                             .padding(12)

@@ -7,7 +7,7 @@ class ChatViewModel: ObservableObject {
     @Published var selectedConversationId: UUID?
     @Published var inputMessage = ""
     @Published var isLoading = false
-    @Published var selectedModel = "deepseek-r1:8b"
+    @Published var selectedModel = ""
     @Published var availableModels: [String] = []
     @Published var errorMessage: String?
     
@@ -29,12 +29,12 @@ class ChatViewModel: ObservableObject {
         do {
             availableModels = try await OllamaService.shared.listModels()
             print("Loaded models: \(availableModels)")
-            if availableModels.isEmpty {
-                availableModels = ["deepseek-r1:8b"]
+            if !availableModels.isEmpty {
+                selectedModel = availableModels[0]
             }
         } catch {
             print("Error loading models: \(error)")
-            availableModels = ["deepseek-r1:8b"]
+            errorMessage = "Failed to load models: \(error.localizedDescription)"
         }
     }
     
@@ -71,19 +71,16 @@ class ChatViewModel: ObservableObject {
             conversations[conversationIndex].messages.append(assistantMessage)
             let assistantIndex = conversations[conversationIndex].messages.count - 1
             
-            print("Sending message: \(prompt)")
+            print("Sending message with model: \(selectedModel)")
             let stream = try await OllamaService.shared.generateResponse(
                 prompt: prompt,
                 messages: Array(conversations[conversationIndex].messages.dropLast()),
-                model: conversations[conversationIndex].model
+                model: selectedModel
             )
             
-            print("Starting to receive response...")
             for try await text in stream {
-                print("Received chunk: \(text)")
                 conversations[conversationIndex].messages[assistantIndex].content += text
             }
-            print("Finished receiving response")
             
             // If we got no response, show an error
             if conversations[conversationIndex].messages[assistantIndex].content.isEmpty {

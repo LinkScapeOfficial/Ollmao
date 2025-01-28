@@ -25,7 +25,7 @@ actor OllamaService {
         return cleaned
     }
     
-    func generateResponse(prompt: String, messages: [ChatMessage], model: String = "deepseek-r1:8b") async throws -> AsyncThrowingStream<String, Error> {
+    func generateResponse(prompt: String, messages: [ChatMessage], model: String) async throws -> AsyncThrowingStream<String, Error> {
         guard let url = URL(string: "\(baseURL)/generate") else {
             throw URLError(.badURL)
         }
