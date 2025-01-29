@@ -7,6 +7,8 @@ class ChatViewModel: ObservableObject {
     @Published var selectedConversationId: UUID?
     @Published var inputMessage = ""
     @Published var isLoading = false
+    @Published var isStreaming = false
+    @Published var currentStreamContent = ""
     @Published var selectedModel = ""
     @Published var availableModels: [String] = []
     @Published var errorMessage: String?
@@ -52,49 +54,38 @@ class ChatViewModel: ObservableObject {
     }
     
     func sendMessage() async {
-        guard !inputMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        guard let conversationIndex = conversations.firstIndex(where: { $0.id == selectedConversationId }) else {
-            newConversation()
+        guard let conversationIndex = selectedConversationIndex,
+              !inputMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return
         }
         
         let userMessage = ChatMessage(role: .user, content: inputMessage)
-        let prompt = inputMessage
+        conversations[conversationIndex].messages.append(userMessage)
         inputMessage = ""
         isLoading = true
-        errorMessage = nil
-        
-        conversations[conversationIndex].messages.append(userMessage)
+        currentStreamContent = ""
         
         do {
-            let assistantMessage = ChatMessage(role: .assistant, content: "")
-            conversations[conversationIndex].messages.append(assistantMessage)
-            let assistantIndex = conversations[conversationIndex].messages.count - 1
-            
-            print("Sending message with model: \(selectedModel)")
+            var streamedResponse = ""
             let stream = try await OllamaService.shared.generateResponse(
-                prompt: prompt,
+                prompt: userMessage.content,
                 messages: Array(conversations[conversationIndex].messages.dropLast()),
                 model: selectedModel
             )
             
-            for try await text in stream {
-                conversations[conversationIndex].messages[assistantIndex].content += text
+            isStreaming = true
+            for try await chunk in stream {
+                streamedResponse += chunk
+                currentStreamContent = streamedResponse
             }
             
-            // If we got no response, show an error
-            if conversations[conversationIndex].messages[assistantIndex].content.isEmpty {
-                conversations[conversationIndex].messages.removeLast()
-                errorMessage = "No response received from the model"
-            }
-            
+            let assistantMessage = ChatMessage(role: .assistant, content: streamedResponse)
+            conversations[conversationIndex].messages.append(assistantMessage)
+            isStreaming = false
+            currentStreamContent = ""
         } catch {
-            print("Error generating response: \(error)")
-            // Remove the empty assistant message if it exists
-            if conversations[conversationIndex].messages.last?.role == .assistant {
-                conversations[conversationIndex].messages.removeLast()
-            }
-            errorMessage = error.localizedDescription
+            print("Error sending message: \(error)")
+            errorMessage = "Failed to send message: \(error.localizedDescription)"
         }
         
         isLoading = false
