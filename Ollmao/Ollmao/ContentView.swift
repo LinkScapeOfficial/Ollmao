@@ -203,13 +203,29 @@ struct MessageView: View {
                 }
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(message.role == .user ? "You" : "Assistant")
-                    .font(.headline)
-                Markdown(message.content)
+                HStack {
+                    Text(message.role == .user ? "You" : "Assistant")
+                        .font(.headline)
+                    Spacer()
+                    Button {
+                        #if os(iOS)
+                        UIPasteboard.general.string = message.content
+                        #else
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(message.content, forType: .string)
+                        #endif
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                Text(message.content)
                     .textSelection(.enabled)
+                    .font(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            
-            Spacer()
         }
         .padding()
         .background(message.role == .user ? Color.gray.opacity(0.2) : Color.clear)
@@ -231,13 +247,29 @@ struct StreamingMessageView: View {
                 }
             
             VStack(alignment: .leading, spacing: 4) {
-                Text("Assistant")
-                    .font(.headline)
-                Markdown(content)
+                HStack {
+                    Text("Assistant")
+                        .font(.headline)
+                    Spacer()
+                    Button {
+                        #if os(iOS)
+                        UIPasteboard.general.string = content
+                        #else
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(content, forType: .string)
+                        #endif
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                Text(content)
                     .textSelection(.enabled)
+                    .font(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            
-            Spacer()
         }
         .padding()
         .background(Color.clear)
