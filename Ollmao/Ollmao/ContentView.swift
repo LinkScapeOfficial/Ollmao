@@ -104,29 +104,24 @@ struct ChatView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            messageList
-            inputArea
-        }
-    }
-    
-    private var messageList: some View {
-        ScrollView {
-            LazyVStack(spacing: 24) {
-                ForEach(conversation.messages) { message in
-                    MessageView(message: message)
-                        .id(message.id)
+            ScrollView {
+                LazyVStack(spacing: 24) {
+                    ForEach(conversation.messages) { message in
+                        MessageView(message: message)
+                            .id(message.id)
+                    }
+                    
+                    if !viewModel.currentStreamContent.isEmpty {
+                        StreamingMessageView(content: viewModel.currentStreamContent)
+                    } else if viewModel.isLoading {
+                        TypingIndicator()
+                    }
                 }
-                
-                if viewModel.isLoading {
-                    TypingIndicator()
-                }
-                
-                if !viewModel.currentStreamContent.isEmpty {
-                    StreamingMessageView(content: viewModel.currentStreamContent)
-                }
+                .padding(.horizontal)
+                .padding(.vertical, 24)
             }
-            .padding(.horizontal)
-            .padding(.vertical, 24)
+            
+            inputArea
         }
     }
     
@@ -193,14 +188,20 @@ struct MessageView: View {
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            // Avatar
-            Circle()
-                .fill(message.role == .user ? Color.blue : Color.green)
-                .frame(width: 30, height: 30)
-                .overlay {
-                    Image(systemName: message.role == .user ? "person.fill" : "brain")
-                        .foregroundColor(.white)
-                }
+            if message.role == .user {
+                Circle()
+                    .fill(Color.blue)
+                    .frame(width: 30, height: 30)
+                    .overlay {
+                        Image(systemName: "person.fill")
+                            .foregroundColor(.white)
+                    }
+            } else {
+                Image("Ollmao")
+                    .resizable()
+                    .frame(width: 30, height: 30)
+                    .clipShape(Circle())
+            }
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -221,10 +222,13 @@ struct MessageView: View {
                     .buttonStyle(.plain)
                 }
                 
-                Text(message.content)
-                    .textSelection(.enabled)
-                    .font(.body)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                if message.content.contains("<think>") {
+                    ThinkingView(content: message.content)
+                } else {
+                    Markdown(message.content)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
         .padding()
@@ -233,18 +237,149 @@ struct MessageView: View {
     }
 }
 
+struct ThinkingView: View {
+    let content: String
+    @State private var isThinkingExpanded = true
+    @State private var brainScale: CGFloat = 1.0
+    
+    var body: some View {
+        let thinkingContent = extractThinkingContent(from: content)
+        if !thinkingContent.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Button {
+                    withAnimation(.spring()) {
+                        isThinkingExpanded.toggle()
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "brain.head.profile")
+                            .foregroundColor(.purple)
+                            .scaleEffect(brainScale)
+                        Text("Thinking Process")
+                            .foregroundColor(.purple)
+                        Spacer()
+                        Image(systemName: isThinkingExpanded ? "chevron.down" : "chevron.right")
+                            .foregroundColor(.purple)
+                    }
+                    .padding(8)
+                    .background(Color.purple.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+                .onAppear {
+                    withAnimation(.easeInOut(duration: 0.6).repeatForever()) {
+                        brainScale = 1.1
+                    }
+                }
+                
+                if isThinkingExpanded {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(thinkingContent)
+                            .textSelection(.enabled)
+                            .padding()
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(8)
+                            .overlay(
+                                Rectangle()
+                                    .fill(Color.purple.opacity(0.3))
+                                    .frame(width: 4)
+                                    .padding(.vertical, 4),
+                                alignment: .leading
+                            )
+                    }
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                
+                // Final answer with markdown
+                Markdown(extractFinalAnswer(from: content))
+                    .textSelection(.enabled)
+                    .padding(.top, 8)
+            }
+        } else {
+            Markdown(content)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+    
+    private func extractThinkingContent(from content: String) -> String {
+        if let start = content.range(of: "<think>")?.upperBound,
+           let end = content.range(of: "</think>")?.lowerBound {
+            let thinking = String(content[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if thinking.first == "\n" {
+                return String(thinking.dropFirst())
+            }
+            return thinking
+        }
+        return ""
+    }
+    
+    private func extractFinalAnswer(from content: String) -> String {
+        if let end = content.range(of: "</think>")?.upperBound {
+            return String(content[end...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return content
+    }
+}
+
+struct ThinkingStreamView: View {
+    let content: String
+    @State private var brainScale: CGFloat = 1.0
+    
+    var body: some View {
+        let cleanContent = content.replacingOccurrences(of: "<think>", with: "")
+            .replacingOccurrences(of: "</think>", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if !cleanContent.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "brain.head.profile")
+                        .foregroundColor(.purple)
+                        .scaleEffect(brainScale)
+                    Text("Thinking Process")
+                        .foregroundColor(.purple)
+                }
+                .padding(8)
+                .background(Color.purple.opacity(0.1))
+                .cornerRadius(8)
+                .onAppear {
+                    withAnimation(.easeInOut(duration: 0.6).repeatForever()) {
+                        brainScale = 1.1
+                    }
+                }
+                
+                let displayContent = cleanContent.first == "\n" ? String(cleanContent.dropFirst()) : cleanContent
+                Text(displayContent)
+                    .textSelection(.enabled)
+                    .padding()
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
+                    .overlay(
+                        Rectangle()
+                            .fill(Color.purple.opacity(0.3))
+                            .frame(width: 4)
+                            .padding(.vertical, 4),
+                        alignment: .leading
+                    )
+            }
+        } else {
+            Markdown(content)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
 struct StreamingMessageView: View {
     let content: String
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Circle()
-                .fill(Color.green)
+            Image("Ollmao")
+                .resizable()
                 .frame(width: 30, height: 30)
-                .overlay {
-                    Image(systemName: "brain")
-                        .foregroundColor(.white)
-                }
+                .clipShape(Circle())
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -265,10 +400,13 @@ struct StreamingMessageView: View {
                     .buttonStyle(.plain)
                 }
                 
-                Text(content)
-                    .textSelection(.enabled)
-                    .font(.body)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                if content.contains("<think>") {
+                    ThinkingStreamView(content: content)
+                } else {
+                    Markdown(content)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
         .padding()
@@ -279,14 +417,11 @@ struct StreamingMessageView: View {
 
 struct TypingIndicator: View {
     var body: some View {
-        HStack {
-            Circle()
-                .fill(Color.green)
+        HStack(alignment: .top, spacing: 12) {
+            Image("Ollmao")
+                .resizable()
                 .frame(width: 30, height: 30)
-                .overlay {
-                    Image(systemName: "brain")
-                        .foregroundColor(.white)
-                }
+                .clipShape(Circle())
             
             Text("Assistant is typing...")
                 .foregroundColor(.secondary)
