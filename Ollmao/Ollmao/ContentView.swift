@@ -174,6 +174,7 @@ struct MessageBubble: View {
                         .background(message.role == .user ? Color.accentColor : Color.secondary.opacity(0.1))
                         .foregroundColor(message.role == .user ? .white : .primary)
                         .cornerRadius(16)
+                        .textSelection(.enabled)
                     
                     if message.role == .user {
                         Button(action: {
