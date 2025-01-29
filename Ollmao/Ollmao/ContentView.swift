@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import MarkdownUI
 
 struct ContentView: View {
     @StateObject private var viewModel = ChatViewModel()
@@ -169,7 +170,7 @@ struct MessageBubble: View {
                         .buttonStyle(.plain)
                     }
                     
-                    Text(message.content)
+                    Markdown(message.content)
                         .padding()
                         .background(message.role == .user ? Color.accentColor : Color.secondary.opacity(0.1))
                         .foregroundColor(message.role == .user ? .white : .primary)
