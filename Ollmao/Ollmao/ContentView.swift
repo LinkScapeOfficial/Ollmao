@@ -148,60 +148,48 @@ struct MessageBubble: View {
     let message: ChatMessage
     
     var body: some View {
-        HStack {
-            if message.role == .user {
-                Spacer()
-            }
-            
-            VStack(alignment: message.role == .user ? .trailing : .leading) {
+        VStack(alignment: message.role == .user ? .trailing : .leading) {
+            if message.role == .assistant {
                 HStack {
-                    if message.role == .assistant {
-                        Button(action: {
-                            #if os(iOS)
-                            UIPasteboard.general.string = message.content
-                            #else
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(message.content, forType: .string)
-                            #endif
-                        }) {
-                            Image(systemName: "doc.on.doc")
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
+                    Button(action: {
+                        #if os(iOS)
+                        UIPasteboard.general.string = message.content
+                        #else
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(message.content, forType: .string)
+                        #endif
+                    }) {
+                        Image(systemName: "doc.on.doc")
+                            .foregroundColor(.secondary)
                     }
+                    .buttonStyle(.plain)
                     
                     Markdown(message.content)
-                        .padding()
-                        .background(message.role == .user ? Color.accentColor : Color.secondary.opacity(0.1))
-                        .foregroundColor(message.role == .user ? .white : .primary)
-                        .cornerRadius(16)
                         .textSelection(.enabled)
                     
-                    if message.role == .user {
-                        Button(action: {
-                            #if os(iOS)
-                            UIPasteboard.general.string = message.content
-                            #else
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(message.content, forType: .string)
-                            #endif
-                        }) {
-                            Image(systemName: "doc.on.doc")
-                                .foregroundColor(.white)
-                        }
-                        .buttonStyle(.plain)
+                    Spacer()
+                }
+                .padding()
+                .background(Color(nsColor: .textBackgroundColor))
+            } else {
+                HStack {
+                    Spacer()
+                    
+                    VStack(alignment: .trailing) {
+                        Text(message.content)
+                            .padding()
+                            .background(Color.accentColor)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
                     }
                 }
-                
-                Text(message.timestamp, style: .time)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                .padding(.horizontal)
             }
-            .frame(maxWidth: 600, alignment: message.role == .user ? .trailing : .leading)
             
-            if message.role == .assistant {
-                Spacer()
-            }
+            Text(message.timestamp, style: .time)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .padding(.horizontal)
         }
     }
 }
