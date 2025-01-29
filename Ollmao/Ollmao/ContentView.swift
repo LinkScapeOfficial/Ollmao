@@ -153,11 +153,43 @@ struct MessageBubble: View {
             }
             
             VStack(alignment: message.role == .user ? .trailing : .leading) {
-                Text(message.content)
-                    .padding()
-                    .background(message.role == .user ? Color.accentColor : Color.secondary.opacity(0.1))
-                    .foregroundColor(message.role == .user ? .white : .primary)
-                    .cornerRadius(16)
+                HStack {
+                    if message.role == .assistant {
+                        Button(action: {
+                            #if os(iOS)
+                            UIPasteboard.general.string = message.content
+                            #else
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(message.content, forType: .string)
+                            #endif
+                        }) {
+                            Image(systemName: "doc.on.doc")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
+                    Text(message.content)
+                        .padding()
+                        .background(message.role == .user ? Color.accentColor : Color.secondary.opacity(0.1))
+                        .foregroundColor(message.role == .user ? .white : .primary)
+                        .cornerRadius(16)
+                    
+                    if message.role == .user {
+                        Button(action: {
+                            #if os(iOS)
+                            UIPasteboard.general.string = message.content
+                            #else
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(message.content, forType: .string)
+                            #endif
+                        }) {
+                            Image(systemName: "doc.on.doc")
+                                .foregroundColor(.white)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
                 
                 Text(message.timestamp, style: .time)
                     .font(.caption2)
