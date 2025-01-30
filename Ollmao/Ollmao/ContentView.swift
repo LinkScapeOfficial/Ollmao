@@ -9,7 +9,14 @@ import SwiftUI
 import MarkdownUI
 
 struct ContentView: View {
-    @StateObject private var viewModel = ChatViewModel()
+    @StateObject private var conversationManager = ConversationManager()
+    @StateObject private var viewModel: ChatViewModel
+    
+    init() {
+        let manager = ConversationManager()
+        _conversationManager = StateObject(wrappedValue: manager)
+        _viewModel = StateObject(wrappedValue: ChatViewModel(conversationManager: manager))
+    }
     
     var body: some View {
         NavigationSplitView {
@@ -18,7 +25,8 @@ struct ContentView: View {
                 selectedId: $viewModel.selectedConversationId,
                 selectedModel: $viewModel.selectedModel,
                 availableModels: viewModel.availableModels,
-                onNewChat: { viewModel.newConversation() }
+                onNewChat: { viewModel.newConversation() },
+                onDelete: { viewModel.deleteConversation($0) }
             )
             .frame(minWidth: 300)
         } detail: {
@@ -37,6 +45,7 @@ struct SidebarView: View {
     @Binding var selectedModel: String
     let availableModels: [String]
     let onNewChat: () -> Void
+    let onDelete: (UUID) -> Void
     
     var body: some View {
         VStack(spacing: 0) {
@@ -64,12 +73,25 @@ struct SidebarView: View {
                         ConversationButton(
                             conversation: conversation,
                             isSelected: selectedId == conversation.id,
-                            action: { selectedId = conversation.id }
-                        )
+                            onDelete: { onDelete(conversation.id) }
+                        ) {
+                            selectedId = conversation.id
+                        }
                         Divider()
                     }
                 }
             }
+            
+            Divider()
+            
+            // Model selector
+            Picker("Model", selection: $selectedModel) {
+                ForEach(availableModels, id: \.self) { model in
+                    Text(model).tag(model)
+                }
+            }
+            .pickerStyle(.menu)
+            .padding()
         }
         .background(Color.gray.opacity(0.1))
     }
@@ -78,6 +100,7 @@ struct SidebarView: View {
 struct ConversationButton: View {
     let conversation: Conversation
     let isSelected: Bool
+    let onDelete: () -> Void
     let action: () -> Void
     
     var body: some View {
@@ -88,6 +111,15 @@ struct ConversationButton: View {
                 Text(conversation.title)
                     .lineLimit(1)
                 Spacer()
+                
+                Menu {
+                    Button(role: .destructive, action: onDelete) {
+                        Label("Delete", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .foregroundColor(.secondary)
+                }
             }
             .padding(.horizontal)
             .padding(.vertical, 12)
@@ -112,10 +144,19 @@ struct ChatView: View {
                     }
                     
                     if !viewModel.currentStreamContent.isEmpty {
-                        StreamingMessageView(content: viewModel.currentStreamContent, isStreaming: viewModel.isStreaming)
+                        MessageView(message: .init(role: .assistant, content: viewModel.currentStreamContent))
                             .id("streaming")
                     } else if viewModel.isLoading {
-                        TypingIndicator()
+                        HStack {
+                            Image("Ollmao")
+                                .resizable()
+                                .frame(width: 30, height: 30)
+                                .clipShape(Circle())
+                            Text("Waiting for assistant...")
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
                     }
                 }
                 .padding(.horizontal)
@@ -136,15 +177,6 @@ struct ChatView: View {
                     .padding()
             }
             
-            // Model selector above input
-            Picker("Model", selection: $viewModel.selectedModel) {
-                ForEach(viewModel.availableModels, id: \.self) { model in
-                    Text(model).tag(model)
-                }
-            }
-            .pickerStyle(.menu)
-            .padding(.horizontal)
-            
             HStack(alignment: .bottom, spacing: 12) {
                 TextField("Send a message...", text: $viewModel.inputMessage, axis: .vertical)
                     .textFieldStyle(.plain)
@@ -161,118 +193,51 @@ struct ChatView: View {
                         }
                     }
                 
-                sendButton
+                Button {
+                    Task {
+                        await viewModel.sendMessage()
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 32))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundColor(viewModel.inputMessage.isEmpty ? .secondary : .accentColor)
+                }
+                .disabled(viewModel.isLoading || viewModel.inputMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .keyboardShortcut(.return, modifiers: [])
             }
             .padding()
         }
         .background(Color.gray.opacity(0.1))
     }
-    
-    private var sendButton: some View {
-        Button {
-            Task {
-                await viewModel.sendMessage()
-            }
-        } label: {
-            Image(systemName: "arrow.up.circle.fill")
-                .font(.system(size: 32))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundColor(viewModel.inputMessage.isEmpty ? .secondary : .accentColor)
-        }
-        .disabled(viewModel.isLoading || viewModel.inputMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        .keyboardShortcut(.return, modifiers: [])
-    }
 }
 
-struct MarkdownView: View {
-    let content: String
-    
+struct EmptyStateView: View {
     var body: some View {
-        Markdown(content)
-            .textSelection(.enabled)
-            .applyCodeBlockStyle()
-            .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(spacing: 16) {
+            Image(systemName: "message")
+                .font(.system(size: 48))
+                .foregroundColor(.secondary)
+            Text("Select or create a conversation")
+                .font(.headline)
+                .foregroundColor(.secondary)
+        }
     }
 }
 
-private extension View {
-    func applyCodeBlockStyle() -> some View {
-        markdownBlockStyle(\.codeBlock) { configuration in
-            VStack(alignment: .leading, spacing: 0) {
-                // Language label if available
-                if let language = configuration.language {
-                    Text(language)
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                }
-                
-                // Code content
-                ScrollView(.horizontal, showsIndicators: false) {
-                    configuration.label
-                        .font(.system(.body, design: .monospaced))
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            .background {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(nsColor: .textBackgroundColor))
-            }
-            .overlay(alignment: .topTrailing) {
-                Button {
-                    #if os(iOS)
-                    UIPasteboard.general.string = configuration.content
-                    #else
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(configuration.content, forType: .string)
-                    #endif
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                        .foregroundColor(.secondary)
-                        .padding(8)
-                }
-                .buttonStyle(.plain)
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-            }
-            .padding(.vertical, 8)  // Add vertical margin
+struct LoadingView: View {
+    var body: some View {
+        HStack(alignment: .top) {
+            Image("Ollmao")
+                .resizable()
+                .frame(width: 30, height: 30)
+                .clipShape(Circle())
+            
+            ProgressView()
+                .padding(.top, 8)
         }
-    }
-    
-    func applyHeadingStyles() -> some View {
-        self
-            .markdownBlockStyle(\.heading1) { config in
-                config.label
-                    .foregroundColor(.primary)
-                    .font(.system(size: 28, weight: .bold))
-                    .padding(.vertical, 8)
-            }
-            .markdownBlockStyle(\.heading2) { config in
-                config.label
-                    .foregroundColor(.primary)
-                    .font(.system(size: 24, weight: .bold))
-                    .padding(.vertical, 6)
-            }
-            .markdownBlockStyle(\.heading3) { config in
-                config.label
-                    .foregroundColor(.primary)
-                    .font(.system(size: 20, weight: .bold))
-                    .padding(.vertical, 4)
-            }
-    }
-    
-    func applyParagraphStyle() -> some View {
-        markdownBlockStyle(\.paragraph) { config in
-            config.label
-                .foregroundColor(.primary)
-                .font(.system(size: 16))
-                .lineSpacing(4)
-                .padding(.vertical, 2)
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
     }
 }
 
@@ -300,7 +265,13 @@ struct MessageView: View {
                 HStack {
                     Text(message.role == .user ? "You" : "Assistant")
                         .font(.headline)
+                    
+                    Text(message.timestamp, style: .time)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
                     Spacer()
+                    
                     Button {
                         #if os(iOS)
                         UIPasteboard.general.string = message.content
@@ -427,266 +398,94 @@ struct ThinkingStreamView: View {
     }
 }
 
-struct StreamingMessageView: View {
+struct MarkdownView: View {
     let content: String
-    let isStreaming: Bool
     
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image("Ollmao")
-                .resizable()
-                .frame(width: 30, height: 30)
-                .clipShape(Circle())
-            
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Assistant")
-                        .font(.headline)
-                    Spacer()
-                    Button {
-                        #if os(iOS)
-                        UIPasteboard.general.string = content
-                        #else
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(content, forType: .string)
-                        #endif
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
+        Markdown(content)
+            .textSelection(.enabled)
+            .applyCodeBlockStyle()
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private extension View {
+    func applyCodeBlockStyle() -> some View {
+        markdownBlockStyle(\.codeBlock) { configuration in
+            VStack(alignment: .leading, spacing: 0) {
+                // Language label if available
+                if let language = configuration.language {
+                    Text(language)
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
                 }
                 
-                ThinkingStreamView(content: content, isStreaming: isStreaming)
+                // Code content
+                ScrollView(.horizontal, showsIndicators: false) {
+                    configuration.label
+                        .font(.system(.body, design: .monospaced))
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
-        }
-        .padding()
-        .background(Color.clear)
-        .cornerRadius(8)
-    }
-}
-
-struct TypingIndicator: View {
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image("Ollmao")
-                .resizable()
-                .frame(width: 30, height: 30)
-                .clipShape(Circle())
-            
-            Text("Assistant is typing...")
-                .foregroundColor(.secondary)
-            Spacer()
-        }
-        .padding()
-    }
-}
-
-struct EmptyStateView: View {
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "message")
-                .font(.system(size: 64))
-                .foregroundColor(.secondary)
-            Text("Select a conversation or start a new chat")
-                .font(.headline)
-                .foregroundColor(.secondary)
-        }
-    }
-}
-
-struct ConversationRow: View {
-    let conversation: Conversation
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(conversation.title)
-                .lineLimit(1)
-                .foregroundColor(.primary)
-            Text(conversation.model)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-struct LoadingView: View {
-    var body: some View {
-        HStack(alignment: .top) {
-            Image("Ollmao")
-                .resizable()
-                .frame(width: 30, height: 30)
-                .clipShape(Circle())
-                .padding(.top, 4)
-            
-            TypingIndicator()
-                .padding()
-            
-            Spacer()
-        }
-        .padding()
-    }
-}
-
-struct StreamingView: View {
-    let content: String
-    
-    var body: some View {
-        HStack(alignment: .top) {
-            Image("Ollmao")
-                .resizable()
-                .frame(width: 30, height: 30)
-                .clipShape(Circle())
-                .padding(.top, 4)
-            
-            VStack(alignment: .leading) {
-                Button(action: {
+            .background {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(nsColor: .textBackgroundColor))
+            }
+            .overlay(alignment: .topTrailing) {
+                Button {
                     #if os(iOS)
-                    UIPasteboard.general.string = content
+                    UIPasteboard.general.string = configuration.content
                     #else
                     NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(content, forType: .string)
+                    NSPasteboard.general.setString(configuration.content, forType: .string)
                     #endif
-                }) {
+                } label: {
                     Image(systemName: "doc.on.doc")
                         .foregroundColor(.secondary)
+                        .padding(8)
                 }
                 .buttonStyle(.plain)
-                
-                ScrollView {
-                    Text(.init(content))
-                        .textSelection(.enabled)
-                }
             }
-            
-            Spacer()
-        }
-        .padding()
-    }
-}
-
-struct MessageBubble: View {
-    let message: ChatMessage
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 16) {
-                if message.role == .assistant {
-                    Image("Ollmao")
-                        .resizable()
-                        .frame(width: 30, height: 30)
-                        .clipShape(Circle())
-                } else {
-                    Image(systemName: "person.circle.fill")
-                        .resizable()
-                        .frame(width: 30, height: 30)
-                        .foregroundColor(.accentColor)
-                }
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    if message.role == .assistant {
-                        Button(action: {
-                            #if os(iOS)
-                            UIPasteboard.general.string = message.content
-                            #else
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(message.content, forType: .string)
-                            #endif
-                        }) {
-                            Image(systemName: "doc.on.doc")
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    
-                    ScrollView {
-                        Text(.init(message.content))
-                            .textSelection(.enabled)
-                    }
-                }
+            .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
             }
-            
-            Text(message.timestamp, style: .time)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-        }
-        .padding()
-        .background(message.role == .user ? Color.accentColor : Color.clear)
-        .cornerRadius(8)
-    }
-}
-
-struct ErrorView: View {
-    let errorMessage: String?
-    
-    var body: some View {
-        if let errorMessage, !errorMessage.isEmpty {
-            Text(errorMessage)
-                .foregroundColor(.red)
-                .padding()
+            .padding(.vertical, 8)  // Add vertical margin
         }
     }
-}
-
-struct MessageInputRow: View {
-    @ObservedObject var viewModel: ChatViewModel
-    @FocusState var isInputFocused: Bool
     
-    var body: some View {
-        HStack(spacing: 12) {
-            TextField("Message...", text: $viewModel.inputMessage, axis: .vertical)
-                .textFieldStyle(.plain)
-                .padding(12)
-                .background(Color.gray.opacity(0.2))
-                .cornerRadius(8)
-                .focused($isInputFocused)
-            
-            SendButton(viewModel: viewModel)
-        }
-        .padding(.horizontal, 48)
-        .padding(.vertical, 16)
-    }
-}
-
-struct SendButton: View {
-    @ObservedObject var viewModel: ChatViewModel
-    
-    var body: some View {
-        Button {
-            Task {
-                await viewModel.sendMessage()
+    func applyHeadingStyles() -> some View {
+        self
+            .markdownBlockStyle(\.heading1) { config in
+                config.label
+                    .foregroundColor(.primary)
+                    .font(.system(size: 28, weight: .bold))
+                    .padding(.vertical, 8)
             }
-        } label: {
-            Image(systemName: "arrow.up.circle.fill")
-                .font(.system(size: 24))
-                .foregroundColor(viewModel.inputMessage.isEmpty ? .secondary : .accentColor)
-        }
-        .disabled(viewModel.isLoading || viewModel.inputMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        .keyboardShortcut(.return, modifiers: [])
+            .markdownBlockStyle(\.heading2) { config in
+                config.label
+                    .foregroundColor(.primary)
+                    .font(.system(size: 24, weight: .bold))
+                    .padding(.vertical, 6)
+            }
+            .markdownBlockStyle(\.heading3) { config in
+                config.label
+                    .foregroundColor(.primary)
+                    .font(.system(size: 20, weight: .bold))
+                    .padding(.vertical, 4)
+            }
     }
-}
-
-struct LoadingContent: View {
-    @ObservedObject var viewModel: ChatViewModel
     
-    var body: some View {
-        if !viewModel.isStreaming {
-            LoadingView()
-        } else if !viewModel.currentStreamContent.isEmpty {
-            StreamingView(content: viewModel.currentStreamContent)
-        }
-    }
-}
-
-struct ChatInputView: View {
-    @ObservedObject var viewModel: ChatViewModel
-    @FocusState var isInputFocused: Bool
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            ErrorView(errorMessage: viewModel.errorMessage)
-            MessageInputRow(viewModel: viewModel, isInputFocused: _isInputFocused)
+    func applyParagraphStyle() -> some View {
+        markdownBlockStyle(\.paragraph) { config in
+            config.label
+                .foregroundColor(.primary)
+                .font(.system(size: 16))
+                .lineSpacing(4)
+                .padding(.vertical, 2)
         }
     }
 }

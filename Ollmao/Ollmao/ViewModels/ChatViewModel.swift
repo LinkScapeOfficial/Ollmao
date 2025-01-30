@@ -3,7 +3,6 @@ import SwiftUI
 
 @MainActor
 class ChatViewModel: ObservableObject {
-    @Published var conversations: [Conversation] = []
     @Published var selectedConversationId: UUID?
     @Published var inputMessage = ""
     @Published var isLoading = false
@@ -13,6 +12,12 @@ class ChatViewModel: ObservableObject {
     @Published var availableModels: [String] = []
     @Published var errorMessage: String?
     
+    private let conversationManager: ConversationManager
+    
+    var conversations: [Conversation] {
+        conversationManager.conversations
+    }
+    
     var selectedConversation: Conversation? {
         conversations.first { $0.id == selectedConversationId }
     }
@@ -21,7 +26,9 @@ class ChatViewModel: ObservableObject {
         conversations.firstIndex { $0.id == selectedConversationId }
     }
     
-    init() {
+    init(conversationManager: ConversationManager) {
+        self.conversationManager = conversationManager
+        self.selectedConversationId = conversationManager.conversations.first?.id
         Task {
             await loadModels()
         }
@@ -41,15 +48,17 @@ class ChatViewModel: ObservableObject {
     }
     
     func newConversation() {
-        let conversation = Conversation(model: selectedModel)
-        conversations.insert(conversation, at: 0)
+        let conversation = Conversation()
+        conversationManager.updateConversation(conversation)
         selectedConversationId = conversation.id
     }
     
     func deleteConversation(_ id: UUID) {
-        conversations.removeAll { $0.id == id }
-        if selectedConversationId == id {
-            selectedConversationId = conversations.first?.id
+        if let conversation = conversations.first(where: { $0.id == id }) {
+            conversationManager.deleteConversation(conversation)
+            if selectedConversationId == id {
+                selectedConversationId = conversations.first?.id
+            }
         }
     }
     
@@ -60,31 +69,36 @@ class ChatViewModel: ObservableObject {
         }
         
         let userMessage = ChatMessage(role: .user, content: inputMessage)
-        conversations[conversationIndex].messages.append(userMessage)
+        var updatedConversation = conversations[conversationIndex]
+        updatedConversation.messages.append(userMessage)
+        conversationManager.updateConversation(updatedConversation)
+        
         inputMessage = ""
         isLoading = true
         currentStreamContent = ""
         
         do {
-            var streamedResponse = ""
             let stream = try await OllamaService.shared.generateResponse(
                 prompt: userMessage.content,
-                messages: Array(conversations[conversationIndex].messages.dropLast()),
+                messages: Array(updatedConversation.messages.dropLast()),
                 model: selectedModel
             )
             
             isStreaming = true
-            for try await chunk in stream {
-                streamedResponse += chunk
+            var streamedResponse = ""
+            
+            for try await text in stream {
+                streamedResponse += text
                 currentStreamContent = streamedResponse
             }
             
-            let assistantMessage = ChatMessage(role: .assistant, content: streamedResponse)
-            conversations[conversationIndex].messages.append(assistantMessage)
+            updatedConversation.messages.append(ChatMessage(role: .assistant, content: streamedResponse))
+            conversationManager.updateConversation(updatedConversation)
+            
             isStreaming = false
             currentStreamContent = ""
         } catch {
-            print("Error sending message: \(error)")
+            print("Error: \(error)")
             errorMessage = "Failed to send message: \(error.localizedDescription)"
         }
         
