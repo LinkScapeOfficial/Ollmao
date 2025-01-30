@@ -225,9 +225,11 @@ struct MessageView: View {
                 if message.content.contains("<think>") {
                     ThinkingView(content: message.content)
                 } else {
-                    Markdown(message.content)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    ScrollView {
+                        Text(.init(message.content))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
             }
         }
@@ -274,31 +276,36 @@ struct ThinkingView: View {
                 
                 if isThinkingExpanded {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text(thinkingContent)
-                            .textSelection(.enabled)
-                            .padding()
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(8)
-                            .overlay(
-                                Rectangle()
-                                    .fill(Color.purple.opacity(0.3))
-                                    .frame(width: 4)
-                                    .padding(.vertical, 4),
-                                alignment: .leading
-                            )
+                        ScrollView {
+                            Text(thinkingContent)
+                                .textSelection(.enabled)
+                                .padding()
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(8)
+                                .overlay(
+                                    Rectangle()
+                                        .fill(Color.purple.opacity(0.3))
+                                        .frame(width: 4)
+                                        .padding(.vertical, 4),
+                                    alignment: .leading
+                                )
+                        }
                     }
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
                 
-                // Final answer with markdown
-                Markdown(extractFinalAnswer(from: content))
-                    .textSelection(.enabled)
-                    .padding(.top, 8)
+                ScrollView {
+                    Text(.init(extractFinalAnswer(from: content)))
+                        .textSelection(.enabled)
+                        .padding(.top, 8)
+                }
             }
         } else {
-            Markdown(content)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            ScrollView {
+                Text(.init(content))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
     
@@ -349,24 +356,28 @@ struct ThinkingStreamView: View {
                     }
                 }
                 
-                let displayContent = cleanContent.first == "\n" ? String(cleanContent.dropFirst()) : cleanContent
-                Text(displayContent)
-                    .textSelection(.enabled)
-                    .padding()
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(8)
-                    .overlay(
-                        Rectangle()
-                            .fill(Color.purple.opacity(0.3))
-                            .frame(width: 4)
-                            .padding(.vertical, 4),
-                        alignment: .leading
-                    )
+                ScrollView {
+                    let displayContent = cleanContent.first == "\n" ? String(cleanContent.dropFirst()) : cleanContent
+                    Text(displayContent)
+                        .textSelection(.enabled)
+                        .padding()
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(8)
+                        .overlay(
+                            Rectangle()
+                                .fill(Color.purple.opacity(0.3))
+                                .frame(width: 4)
+                                .padding(.vertical, 4),
+                            alignment: .leading
+                        )
+                }
             }
         } else {
-            Markdown(content)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            ScrollView {
+                Text(.init(content))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 }
@@ -403,9 +414,11 @@ struct StreamingMessageView: View {
                 if content.contains("<think>") {
                     ThinkingStreamView(content: content)
                 } else {
-                    Markdown(content)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    ScrollView {
+                        Text(.init(content))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
             }
         }
@@ -503,8 +516,10 @@ struct StreamingView: View {
                 }
                 .buttonStyle(.plain)
                 
-                Markdown(content)
-                    .textSelection(.enabled)
+                ScrollView {
+                    Text(.init(content))
+                        .textSelection(.enabled)
+                }
             }
             
             Spacer()
@@ -547,10 +562,10 @@ struct MessageBubble: View {
                         .buttonStyle(.plain)
                     }
                     
-                    Markdown(message.content)
-                        .textSelection(.enabled)
-                        .markdownTheme(.gitHub)
-                        .foregroundColor(message.role == .user ? .white : .primary)
+                    ScrollView {
+                        Text(.init(message.content))
+                            .textSelection(.enabled)
+                    }
                 }
             }
             
