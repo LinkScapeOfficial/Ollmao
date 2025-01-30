@@ -223,7 +223,7 @@ struct MessageView: View {
                 }
                 
                 if message.content.contains("<think>") {
-                    ThinkingView(content: message.content)
+                    ThinkingStreamView(content: message.content)
                 } else {
                     ScrollView {
                         Text(.init(message.content))
@@ -304,31 +304,29 @@ struct ThinkingStreamView: View {
     @State private var brainScale: CGFloat = 1.0
     
     var body: some View {
-        let cleanContent = content.replacingOccurrences(of: "<think>", with: "")
-            .replacingOccurrences(of: "</think>", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let (thinkingContent, finalAnswer) = extractContent(from: content)
         
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "brain.head.profile")
-                    .foregroundColor(.purple)
-                    .scaleEffect(brainScale)
-                Text(cleanContent.isEmpty ? "No thinking process" : "Thinking Process")
-                    .foregroundColor(.purple)
-            }
-            .padding(8)
-            .background(Color.purple.opacity(0.1))
-            .cornerRadius(8)
-            .onAppear {
-                withAnimation(.easeInOut(duration: 0.6).repeatForever()) {
-                    brainScale = 1.1
-                }
-            }
-            
-            if !cleanContent.isEmpty {
-                ScrollView {
-                    let displayContent = cleanContent.first == "\n" ? String(cleanContent.dropFirst()) : cleanContent
-                    Text(displayContent)
+            // Only show thinking process if it exists
+            if !thinkingContent.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "brain.head.profile")
+                            .foregroundColor(.purple)
+                            .scaleEffect(brainScale)
+                        Text("Thinking Process")
+                            .foregroundColor(.purple)
+                    }
+                    .padding(8)
+                    .background(Color.purple.opacity(0.1))
+                    .cornerRadius(8)
+                    .onAppear {
+                        withAnimation(.easeInOut(duration: 0.6).repeatForever()) {
+                            brainScale = 1.1
+                        }
+                    }
+                    
+                    Text(thinkingContent)
                         .textSelection(.enabled)
                         .padding()
                         .background(Color.gray.opacity(0.1))
@@ -342,7 +340,42 @@ struct ThinkingStreamView: View {
                         )
                 }
             }
+            
+            // Show final answer as normal text
+            if !finalAnswer.isEmpty {
+                Text(.init(finalAnswer))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
+    }
+    
+    private func extractContent(from content: String) -> (thinking: String, answer: String) {
+        // If we don't have a complete thinking process (no </think>), treat everything as thinking
+        guard content.contains("</think>") else {
+            let cleanContent = content
+                .replacingOccurrences(of: "<think>", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return (thinking: cleanContent, answer: "")
+        }
+        
+        // Extract thinking content
+        var thinkingContent = ""
+        if let start = content.range(of: "<think>")?.upperBound,
+           let end = content.range(of: "</think>")?.lowerBound {
+            thinkingContent = String(content[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if thinkingContent.first == "\n" {
+                thinkingContent = String(thinkingContent.dropFirst())
+            }
+        }
+        
+        // Extract final answer
+        var finalAnswer = ""
+        if let end = content.range(of: "</think>")?.upperBound {
+            finalAnswer = String(content[end...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        
+        return (thinking: thinkingContent, answer: finalAnswer)
     }
 }
 
