@@ -246,52 +246,22 @@ struct ThinkingView: View {
     
     var body: some View {
         let thinkingContent = extractThinkingContent(from: content)
-        if !thinkingContent.isEmpty {
+        if content.contains("<think>") {
             VStack(alignment: .leading, spacing: 8) {
-                Button {
-                    withAnimation(.spring()) {
-                        isThinkingExpanded.toggle()
-                    }
-                } label: {
-                    HStack {
-                        Image(systemName: "brain.head.profile")
-                            .foregroundColor(.purple)
-                            .scaleEffect(brainScale)
-                        Text("Thinking Process")
-                            .foregroundColor(.purple)
-                        Spacer()
-                        Image(systemName: isThinkingExpanded ? "chevron.down" : "chevron.right")
-                            .foregroundColor(.purple)
-                    }
-                    .padding(8)
-                    .background(Color.purple.opacity(0.1))
-                    .cornerRadius(8)
+                HStack {
+                    Image(systemName: "brain.head.profile")
+                        .foregroundColor(.purple)
+                        .scaleEffect(brainScale)
+                    Text(thinkingContent.isEmpty ? "No thinking process" : "Thinking Process")
+                        .foregroundColor(.purple)
                 }
-                .buttonStyle(.plain)
+                .padding(8)
+                .background(Color.purple.opacity(0.1))
+                .cornerRadius(8)
                 .onAppear {
                     withAnimation(.easeInOut(duration: 0.6).repeatForever()) {
                         brainScale = 1.1
                     }
-                }
-                
-                if isThinkingExpanded {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ScrollView {
-                            Text(thinkingContent)
-                                .textSelection(.enabled)
-                                .padding()
-                                .background(Color.gray.opacity(0.1))
-                                .cornerRadius(8)
-                                .overlay(
-                                    Rectangle()
-                                        .fill(Color.purple.opacity(0.3))
-                                        .frame(width: 4)
-                                        .padding(.vertical, 4),
-                                    alignment: .leading
-                                )
-                        }
-                    }
-                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
                 
                 ScrollView {
@@ -338,24 +308,24 @@ struct ThinkingStreamView: View {
             .replacingOccurrences(of: "</think>", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         
-        if !cleanContent.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "brain.head.profile")
-                        .foregroundColor(.purple)
-                        .scaleEffect(brainScale)
-                    Text("Thinking Process")
-                        .foregroundColor(.purple)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "brain.head.profile")
+                    .foregroundColor(.purple)
+                    .scaleEffect(brainScale)
+                Text(cleanContent.isEmpty ? "No thinking process" : "Thinking Process")
+                    .foregroundColor(.purple)
+            }
+            .padding(8)
+            .background(Color.purple.opacity(0.1))
+            .cornerRadius(8)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.6).repeatForever()) {
+                    brainScale = 1.1
                 }
-                .padding(8)
-                .background(Color.purple.opacity(0.1))
-                .cornerRadius(8)
-                .onAppear {
-                    withAnimation(.easeInOut(duration: 0.6).repeatForever()) {
-                        brainScale = 1.1
-                    }
-                }
-                
+            }
+            
+            if !cleanContent.isEmpty {
                 ScrollView {
                     let displayContent = cleanContent.first == "\n" ? String(cleanContent.dropFirst()) : cleanContent
                     Text(displayContent)
@@ -371,12 +341,6 @@ struct ThinkingStreamView: View {
                             alignment: .leading
                         )
                 }
-            }
-        } else {
-            ScrollView {
-                Text(.init(content))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
