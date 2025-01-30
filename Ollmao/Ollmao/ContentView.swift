@@ -112,7 +112,8 @@ struct ChatView: View {
                     }
                     
                     if !viewModel.currentStreamContent.isEmpty {
-                        StreamingMessageView(content: viewModel.currentStreamContent)
+                        StreamingMessageView(content: viewModel.currentStreamContent, isStreaming: viewModel.isStreaming)
+                            .id("streaming")
                     } else if viewModel.isLoading {
                         TypingIndicator()
                     }
@@ -183,6 +184,98 @@ struct ChatView: View {
     }
 }
 
+struct MarkdownView: View {
+    let content: String
+    
+    var body: some View {
+        Markdown(content)
+            .textSelection(.enabled)
+            .applyCodeBlockStyle()
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private extension View {
+    func applyCodeBlockStyle() -> some View {
+        markdownBlockStyle(\.codeBlock) { configuration in
+            VStack(alignment: .leading, spacing: 0) {
+                // Language label if available
+                if let language = configuration.language {
+                    Text(language)
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                }
+                
+                // Code content
+                ScrollView(.horizontal, showsIndicators: false) {
+                    configuration.label
+                        .font(.system(.body, design: .monospaced))
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .background {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(nsColor: .textBackgroundColor))
+            }
+            .overlay(alignment: .topTrailing) {
+                Button {
+                    #if os(iOS)
+                    UIPasteboard.general.string = configuration.content
+                    #else
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(configuration.content, forType: .string)
+                    #endif
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .foregroundColor(.secondary)
+                        .padding(8)
+                }
+                .buttonStyle(.plain)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            }
+            .padding(.vertical, 8)  // Add vertical margin
+        }
+    }
+    
+    func applyHeadingStyles() -> some View {
+        self
+            .markdownBlockStyle(\.heading1) { config in
+                config.label
+                    .foregroundColor(.primary)
+                    .font(.system(size: 28, weight: .bold))
+                    .padding(.vertical, 8)
+            }
+            .markdownBlockStyle(\.heading2) { config in
+                config.label
+                    .foregroundColor(.primary)
+                    .font(.system(size: 24, weight: .bold))
+                    .padding(.vertical, 6)
+            }
+            .markdownBlockStyle(\.heading3) { config in
+                config.label
+                    .foregroundColor(.primary)
+                    .font(.system(size: 20, weight: .bold))
+                    .padding(.vertical, 4)
+            }
+    }
+    
+    func applyParagraphStyle() -> some View {
+        markdownBlockStyle(\.paragraph) { config in
+            config.label
+                .foregroundColor(.primary)
+                .font(.system(size: 16))
+                .lineSpacing(4)
+                .padding(.vertical, 2)
+        }
+    }
+}
+
 struct MessageView: View {
     let message: ChatMessage
     
@@ -225,11 +318,7 @@ struct MessageView: View {
                 if message.content.contains("<think>") {
                     ThinkingStreamView(content: message.content)
                 } else {
-                    ScrollView {
-                        Text(.init(message.content))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                    MarkdownView(content: message.content)
                 }
             }
         }
@@ -239,148 +328,108 @@ struct MessageView: View {
     }
 }
 
-struct ThinkingView: View {
+struct ThinkingStreamView: View {
     let content: String
-    @State private var isThinkingExpanded = true
+    let isStreaming: Bool
     @State private var brainScale: CGFloat = 1.0
+    @State private var isExpanded: Bool = true
+    
+    init(content: String, isStreaming: Bool = false) {
+        self.content = content
+        self.isStreaming = isStreaming
+        _isExpanded = State(initialValue: isStreaming)
+    }
     
     var body: some View {
         let thinkingContent = extractThinkingContent(from: content)
-        if content.contains("<think>") {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "brain.head.profile")
-                        .foregroundColor(.purple)
-                        .scaleEffect(brainScale)
-                    Text(thinkingContent.isEmpty ? "No thinking process" : "Thinking Process")
-                        .foregroundColor(.purple)
-                }
-                .padding(8)
-                .background(Color.purple.opacity(0.1))
-                .cornerRadius(8)
-                .onAppear {
-                    withAnimation(.easeInOut(duration: 0.6).repeatForever()) {
-                        brainScale = 1.1
-                    }
-                }
-                
-                ScrollView {
-                    Text(.init(extractFinalAnswer(from: content)))
-                        .textSelection(.enabled)
-                        .padding(.top, 8)
-                }
-            }
-        } else {
-            ScrollView {
-                Text(.init(content))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-    }
-    
-    private func extractThinkingContent(from content: String) -> String {
-        if let start = content.range(of: "<think>")?.upperBound,
-           let end = content.range(of: "</think>")?.lowerBound {
-            let thinking = String(content[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
-            if thinking.first == "\n" {
-                return String(thinking.dropFirst())
-            }
-            return thinking
-        }
-        return ""
-    }
-    
-    private func extractFinalAnswer(from content: String) -> String {
-        if let end = content.range(of: "</think>")?.upperBound {
-            return String(content[end...]).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        return content
-    }
-}
-
-struct ThinkingStreamView: View {
-    let content: String
-    @State private var brainScale: CGFloat = 1.0
-    
-    var body: some View {
-        let (thinkingContent, finalAnswer) = extractContent(from: content)
         
         VStack(alignment: .leading, spacing: 12) {
-            // Only show thinking process if it exists
-            if !thinkingContent.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
+            // Thinking process section
+            VStack(alignment: .leading, spacing: 8) {
+                Button(action: { withAnimation { isExpanded.toggle() } }) {
                     HStack {
                         Image(systemName: "brain.head.profile")
                             .foregroundColor(.purple)
                             .scaleEffect(brainScale)
                         Text("Thinking Process")
                             .foregroundColor(.purple)
+                        Spacer()
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .foregroundColor(.purple)
                     }
                     .padding(8)
                     .background(Color.purple.opacity(0.1))
                     .cornerRadius(8)
-                    .onAppear {
-                        withAnimation(.easeInOut(duration: 0.6).repeatForever()) {
-                            brainScale = 1.1
+                }
+                .buttonStyle(.plain)
+                .onAppear {
+                    withAnimation(.easeInOut(duration: 0.6).repeatForever()) {
+                        brainScale = 1.1
+                    }
+                }
+                
+                if isExpanded {
+                    Group {
+                        if thinkingContent.isEmpty {
+                            Text("No thinking process")
+                                .foregroundColor(.secondary)
+                                .padding()
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(8)
+                        } else {
+                            Text(thinkingContent)
+                                .textSelection(.enabled)
+                                .padding()
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(8)
+                                .overlay(
+                                    Rectangle()
+                                        .fill(Color.purple.opacity(0.3))
+                                        .frame(width: 4)
+                                        .padding(.vertical, 4),
+                                    alignment: .leading
+                                )
                         }
                     }
-                    
-                    Text(thinkingContent)
-                        .textSelection(.enabled)
-                        .padding()
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(8)
-                        .overlay(
-                            Rectangle()
-                                .fill(Color.purple.opacity(0.3))
-                                .frame(width: 4)
-                                .padding(.vertical, 4),
-                            alignment: .leading
-                        )
+                    .transition(AnyTransition.move(edge: .top).combined(with: .opacity))
                 }
             }
             
-            // Show final answer as normal text
-            if !finalAnswer.isEmpty {
-                Text(.init(finalAnswer))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            // Final answer section
+            if let finalContent = extractFinalContent(from: content), !finalContent.isEmpty {
+                MarkdownView(content: finalContent)
+            }
+        }
+        .onChange(of: isStreaming) { _, newValue in
+            withAnimation {
+                isExpanded = newValue
             }
         }
     }
     
-    private func extractContent(from content: String) -> (thinking: String, answer: String) {
-        // If we don't have a complete thinking process (no </think>), treat everything as thinking
-        guard content.contains("</think>") else {
-            let cleanContent = content
-                .replacingOccurrences(of: "<think>", with: "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            return (thinking: cleanContent, answer: "")
+    private func extractThinkingContent(from content: String) -> String {
+        guard let startRange = content.range(of: "<think>") else { return "" }
+        
+        let afterStartTag = content[startRange.upperBound...]
+        if let endRange = afterStartTag.range(of: "</think>") {
+            let thinking = String(afterStartTag[..<endRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            return thinking.isEmpty ? "" : thinking
         }
         
-        // Extract thinking content
-        var thinkingContent = ""
-        if let start = content.range(of: "<think>")?.upperBound,
-           let end = content.range(of: "</think>")?.lowerBound {
-            thinkingContent = String(content[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
-            if thinkingContent.first == "\n" {
-                thinkingContent = String(thinkingContent.dropFirst())
-            }
-        }
-        
-        // Extract final answer
-        var finalAnswer = ""
-        if let end = content.range(of: "</think>")?.upperBound {
-            finalAnswer = String(content[end...]).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        
-        return (thinking: thinkingContent, answer: finalAnswer)
+        let thinking = String(afterStartTag).trimmingCharacters(in: .whitespacesAndNewlines)
+        return thinking.isEmpty ? "" : thinking
+    }
+    
+    private func extractFinalContent(from content: String) -> String? {
+        guard let endRange = content.range(of: "</think>") else { return nil }
+        return String(content[endRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
 struct StreamingMessageView: View {
     let content: String
+    let isStreaming: Bool
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -408,15 +457,7 @@ struct StreamingMessageView: View {
                     .buttonStyle(.plain)
                 }
                 
-                if content.contains("<think>") {
-                    ThinkingStreamView(content: content)
-                } else {
-                    ScrollView {
-                        Text(.init(content))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
+                ThinkingStreamView(content: content, isStreaming: isStreaming)
             }
         }
         .padding()
