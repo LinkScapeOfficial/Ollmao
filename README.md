@@ -18,7 +18,7 @@ Run powerful AI models locally on your Mac with Ollmao - a native SwiftUI app th
 
 ## Installation
 
-1. Install Ollama from [ollama.ai](https://ollama.com)
+1. Install Ollama from [ollama.com](https://ollama.com)
 2. Download the latest release of Ollmao
 3. Move Ollmao.app to your Applications folder
 
