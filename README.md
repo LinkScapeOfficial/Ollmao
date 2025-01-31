@@ -1,6 +1,22 @@
-# Ollmao
+<h1 align="center">
+  <img src="https://ollmao.com/ollmao_icon.svg" width = "200" height = "200">
+  <br />
+  Ollmao
+</h1>
 
-Run powerful AI models locally on your Mac with Ollmao - a native SwiftUI app that integrates with Ollama.
+<p align="center">
+  <a href="https://www.ollmao.com">Website</a>
+  ·
+  <a href="https://github.com/LinkScapeOfficial/Ollmao/releases">Releases</a>
+  <br />
+  <br />
+  Run powerful AI models locally on your Mac with Ollmao - a native SwiftUI app that integrates with Ollama.
+</p>
+
+<p align="center">
+<img alt="Downloads" src="https://img.shields.io/github/downloads/LinkScapeOfficial/Ollmao/total?label=Downloads" height=22.5>
+<img alt="License" src="https://img.shields.io/github/license/LinkScapeOfficial/Ollmao?label=License" height=22.5>
+</p>
 
 ## Features
 
