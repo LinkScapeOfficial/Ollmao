@@ -4,71 +4,113 @@ struct SetupView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var viewModel: ChatViewModel
     @State private var currentStep = 0
+    @State private var previousStep = 0
     @State private var systemRAM: Double = 0
     @State private var selectedModels: Set<String> = []
     @State private var showAdvancedSelection = false
     
     private let ollamaDownloadUrl = "https://ollama.com/download/Ollama-darwin.zip"
     
-    var modelCommands: String {
+    private var modelCommands: String {
         selectedModels.map { "ollama pull \($0)" }.joined(separator: " && ")
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            Group {
-                switch currentStep {
-                case 0:
-                    welcomeView
-                case 1:
-                    installOllamaView
-                case 2:
-                    modelSelectionView
-                default:
-                    completionView
+        ZStack(alignment: .bottom) {
+            ScrollView {
+                Group {
+                    switch currentStep {
+                    case 0:
+                        welcomeView
+                            .transition(currentStep > previousStep ? 
+                                .asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)) :
+                                .asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .trailing)))
+                    case 1:
+                        installOllamaView
+                            .transition(currentStep > previousStep ? 
+                                .asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)) :
+                                .asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .trailing)))
+                    case 2:
+                        modelSelectionView
+                            .transition(currentStep > previousStep ? 
+                                .asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)) :
+                                .asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .trailing)))
+                    case 3:
+                        installCommandsView
+                            .transition(currentStep > previousStep ? 
+                                .asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)) :
+                                .asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .trailing)))
+                    default:
+                        completionView
+                            .transition(currentStep > previousStep ? 
+                                .asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading)) :
+                                .asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .trailing)))
+                    }
                 }
             }
-            .transition(.asymmetric(
-                insertion: .move(edge: .trailing),
-                removal: .move(edge: .leading)
-            ))
+            .safeAreaInset(edge: .bottom) {
+                Color.clear.frame(height: 70)
+            }
             
-            Divider()
-            
-            HStack {
-                if currentStep > 0 {
-                    Button("← Back") {
-                        withAnimation(.easeInOut) {
-                            currentStep -= 1
+            VStack(spacing: 0) {
+                Divider()
+                HStack {
+                    if currentStep > 0 {
+                        Button("← Back") {
+                            previousStep = currentStep
+                            withAnimation(.easeInOut) {
+                                currentStep -= 1
+                            }
                         }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                }
-                
-                Button("Skip Setup") {
-                    viewModel.completeSetup()
-                    dismiss()
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                
-                Spacer()
-                
-                Button(currentStep < 3 ? "Continue →" : "Start Using Ollmao") {
-                    if currentStep < 3 {
-                        withAnimation(.easeInOut) {
-                            currentStep += 1
-                        }
-                    } else {
+                    
+                    Button("Skip Setup") {
                         viewModel.completeSetup()
                         dismiss()
                     }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    
+                    Spacer()
+                    
+                    if currentStep < 4 {
+                        Button {
+                            previousStep = currentStep
+                            withAnimation(.easeInOut) {
+                                currentStep += 1
+                            }
+                        } label: {
+                            HStack {
+                                Text("Continue")
+                                Image(systemName: "arrow.right")
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.accentColor)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button {
+                            viewModel.completeSetup()
+                            dismiss()
+                        } label: {
+                            Text("Start Using Ollmao")
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.accentColor)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .buttonStyle(.plain)
-                .fontWeight(.medium)
+                .padding(.horizontal, 40)
+                .padding(.vertical, 20)
+                .background(.background)
             }
-            .padding(.horizontal, 40)
-            .padding(.vertical, 20)
         }
         .frame(width: 800, height: 600)
         .onAppear {
@@ -77,52 +119,78 @@ struct SetupView: View {
     }
     
     private var welcomeView: some View {
-        ScrollView {
-            VStack(spacing: 40) {
-                Image("Logo")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 160, height: 160)
-                
-                VStack(spacing: 16) {
-                    Text("Welcome to Ollmao")
-                        .font(.system(size: 36, weight: .bold))
-                    
-                    Text("Your Personal AI Assistant")
-                        .font(.title2)
-                        .foregroundStyle(.secondary)
-                }
-                
-                HStack(spacing: 24) {
-                    featureBox(
-                        icon: "lock.shield.fill",
-                        title: "100% Private",
-                        description: "All processing happens locally"
-                    )
-                    
-                    featureBox(
-                        icon: "banknote.fill",
-                        title: "Free to Use",
-                        description: "No subscriptions or API keys"
-                    )
-                }
-                
-                HStack(spacing: 24) {
-                    featureBox(
-                        icon: "cpu.fill",
-                        title: "Powerful Models",
-                        description: "State-of-the-art AI on your Mac"
-                    )
-                    
-                    featureBox(
-                        icon: "bolt.fill",
-                        title: "Fast Response",
-                        description: "No internet latency"
-                    )
-                }
+        VStack(spacing: 24) {
+            Image("Logo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 120, height: 120)
+            
+            Text("Welcome to Ollmao")
+                .font(.system(size: 32, weight: .bold))
+            
+            VStack(spacing: 8) {
+                Text("(oh-LAH-mah for Ollama)")
+                    .font(.system(.title3))
+                    .foregroundStyle(.secondary)
+                Text("(OH-luh-MAO for Ollmao)")
+                    .font(.system(.title3))
+                    .foregroundStyle(.secondary)
             }
-            .padding(40)
+            
+            Text("Your AI coding assistant powered by Ollama")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 400)
+            
+            HStack(spacing: 16) {
+                featureBox(
+                    icon: "lock.shield.fill",
+                    title: "100% Private",
+                    description: "Local processing"
+                )
+                
+                featureBox(
+                    icon: "banknote.fill",
+                    title: "Free to Use",
+                    description: "No API keys"
+                )
+            }
+            
+            HStack(spacing: 16) {
+                featureBox(
+                    icon: "cpu.fill",
+                    title: "Powerful Models",
+                    description: "Latest AI models"
+                )
+                
+                featureBox(
+                    icon: "bolt.fill",
+                    title: "Fast Response",
+                    description: "No latency"
+                )
+            }
         }
+        .padding(40)
+    }
+    
+    private func featureBox(icon: String, title: String, description: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundColor(.blue)
+                Text(title)
+                    .font(.headline)
+            }
+            Text(description)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.quaternary)
+        .cornerRadius(12)
     }
     
     private var installOllamaView: some View {
@@ -181,7 +249,7 @@ struct SetupView: View {
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 80, height: 80)
             
-            VStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(title)
                     .font(.headline)
                 Text("(\(pronunciation))")
@@ -194,26 +262,6 @@ struct SetupView: View {
         }
         .frame(width: 160)
         .padding(20)
-        .background(.quaternary)
-        .cornerRadius(16)
-    }
-    
-    private func featureBox(icon: String, title: String, description: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Image(systemName: icon)
-                .font(.title)
-                .foregroundColor(.blue)
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text(title)
-                    .font(.headline)
-                Text(description)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(24)
         .background(.quaternary)
         .cornerRadius(16)
     }
@@ -311,47 +359,72 @@ struct SetupView: View {
     }
     
     private var completionView: some View {
-        ScrollView {
-            VStack(spacing: 40) {
-                Text("You're All Set!")
-                    .font(.system(size: 28, weight: .bold))
-                
-                if !selectedModels.isEmpty {
-                    Text("Installing your selected models:")
+        VStack(spacing: 32) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 64))
+                .foregroundStyle(.green)
+            
+            Text("You're All Set!")
+                .font(.system(size: 32, weight: .bold))
+            
+            Text("Start chatting with your AI assistant")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+        }
+        .padding(40)
+    }
+    
+    private var installCommandsView: some View {
+        VStack(spacing: 32) {
+            Text("Install Selected Models")
+                .font(.system(size: 28, weight: .bold))
+            
+            if !selectedModels.isEmpty {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Run this command in Terminal:")
                         .font(.headline)
                     
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Copy and paste this in Terminal:")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    HStack {
+                        Text(modelCommands)
+                            .font(.system(.body, design: .monospaced))
+                            .padding()
+                            .background(.background)
+                            .cornerRadius(8)
                         
-                        HStack {
-                            Text(modelCommands)
-                                .font(.system(.body, design: .monospaced))
-                                .padding()
-                                .background(.background)
+                        Button {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(modelCommands, forType: .string)
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                                .padding(8)
+                                .background(Color.accentColor)
+                                .foregroundColor(.white)
                                 .cornerRadius(8)
-                            
-                            Button("Copy") {
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(modelCommands, forType: .string)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        
-                        Button("Open Terminal") {
-                            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
                         }
                         .buttonStyle(.plain)
-                        .padding(.top)
                     }
-                    .padding()
-                    .background(.background)
-                    .cornerRadius(12)
+                    
+                    Button {
+                        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
+                    } label: {
+                        HStack {
+                            Image(systemName: "terminal")
+                            Text("Open Terminal")
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.accentColor)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
                 }
+                .padding()
+                .background(.background)
+                .cornerRadius(12)
             }
-            .padding(40)
         }
+        .padding(40)
     }
     
     private let modelFamilies = [
