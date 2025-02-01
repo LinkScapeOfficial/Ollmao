@@ -36,6 +36,20 @@ struct ContentView: View {
                 EmptyStateView()
             }
         }
+        .sheet(isPresented: $viewModel.showSetup) {
+            SetupView(viewModel: viewModel)
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Button("Setup Guide") {
+                        viewModel.showSetupGuide()
+                    }
+                } label: {
+                    Image(systemName: "gear")
+                }
+            }
+        }
     }
 }
 

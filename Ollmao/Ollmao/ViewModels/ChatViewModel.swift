@@ -11,6 +11,8 @@ class ChatViewModel: ObservableObject {
     @Published var selectedModel = ""
     @Published var availableModels: [String] = []
     @Published var errorMessage: String?
+    @Published var showSetup = false
+    @AppStorage("hasCompletedSetup") private var hasCompletedSetup = false
     
     private let conversationManager: ConversationManager
     
@@ -29,6 +31,11 @@ class ChatViewModel: ObservableObject {
     init(conversationManager: ConversationManager) {
         self.conversationManager = conversationManager
         self.selectedConversationId = conversationManager.conversations.first?.id
+        
+        if !hasCompletedSetup {
+            showSetup = true
+        }
+        
         Task {
             await loadModels()
         }
@@ -103,5 +110,24 @@ class ChatViewModel: ObservableObject {
         }
         
         isLoading = false
+    }
+    
+    func completeSetup() {
+        hasCompletedSetup = true
+        showSetup = false
+    }
+    
+    func showSetupGuide() {
+        showSetup = true
+    }
+    
+    func downloadModel(_ modelName: String) async throws {
+        do {
+            try await OllamaService.shared.pullModel(name: modelName)
+            await loadModels()
+        } catch {
+            errorMessage = "Failed to download model \(modelName): \(error.localizedDescription)"
+            throw error
+        }
     }
 }
