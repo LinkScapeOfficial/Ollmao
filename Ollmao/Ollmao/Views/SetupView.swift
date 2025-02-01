@@ -240,7 +240,7 @@ struct SetupView: View {
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 80, height: 80)
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(spacing: 8) {
                 Text(title)
                     .font(.headline)
                 Text("(\(pronunciation))")
@@ -250,9 +250,10 @@ struct SetupView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+            .multilineTextAlignment(.center)
         }
-        .frame(width: 160)
-        .padding(20)
+        .frame(maxWidth: .infinity)
+        .padding(24)
         .background(.quaternary)
         .cornerRadius(16)
     }
