@@ -356,7 +356,7 @@ struct SetupView: View {
     
     private let modelFamilies = [
         ModelFamily(
-            name: "DeepSeek",
+            name: "DeepSeek-r1",
             description: "DeepSeek's first-generation reasoning models with comparable performance to OpenAI-o1",
             sizes: [
                 ModelSize(name: "1.5b", ramGB: 8),
@@ -407,7 +407,7 @@ struct SetupView: View {
                     .foregroundStyle(.yellow)
             }
             
-            let recommendedModel = systemRAM >= 16 ? "qwen2.5-7b" : "qwen2.5-1.5b"
+            let recommendedModel = systemRAM >= 16 ? "qwen2.5:7b" : "qwen2.5:1.5b"
             let modelSize = systemRAM >= 16 ? "7B" : "1.5B"
             let isSelected = selectedModels.contains(recommendedModel)
             
@@ -536,8 +536,8 @@ struct ModelFamilyCard: View {
             ], spacing: 12) {
                 ForEach(family.sizes, id: \.name) { size in
                     ModelSizeButton(
-                        size: size,
                         familyName: family.name,
+                        size: size,
                         systemRAM: systemRAM,
                         selectedModels: $selectedModels
                     )
@@ -552,13 +552,13 @@ struct ModelFamilyCard: View {
 }
 
 struct ModelSizeButton: View {
-    let size: ModelSize
     let familyName: String
+    let size: ModelSize
     let systemRAM: Double
     @Binding var selectedModels: Set<String>
     
     var modelId: String {
-        "\(familyName.lowercased())-\(size.name)"
+        "\(familyName.lowercased()):\(size.name)"
     }
     
     var isSelected: Bool {

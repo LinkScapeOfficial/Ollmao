@@ -67,7 +67,7 @@ struct SidebarView: View {
             Button(action: onNewChat) {
                 HStack {
                     Image(systemName: "plus")
-                    Text("New Chat")
+                    Text("New Conversation")
                     Spacer()
                 }
                 .padding()
@@ -77,6 +77,7 @@ struct SidebarView: View {
                 .padding(.vertical, 8)
             }
             .buttonStyle(.plain)
+            .keyboardShortcut("n", modifiers: .command)
             
             Divider()
             
@@ -117,26 +118,38 @@ struct ConversationButton: View {
     let onDelete: () -> Void
     let action: () -> Void
     
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+    
     var body: some View {
         Button(action: action) {
             HStack {
-                Image(systemName: "message")
-                    .foregroundColor(.secondary)
-                Text(conversation.title)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(dateFormatter.string(from: conversation.createdAt))
+                        .font(.headline)
+                    
+                    if !conversation.messages.isEmpty {
+                        Text(conversation.messages.first?.content.prefix(50) ?? "")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                
                 Spacer()
                 
-                Menu {
-                    Button(role: .destructive, action: onDelete) {
-                        Label("Delete", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .foregroundColor(.secondary)
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .foregroundStyle(.secondary)
                 }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.delete, modifiers: .command)
             }
-            .padding(.horizontal)
-            .padding(.vertical, 12)
+            .padding()
             .background(isSelected ? Color.gray.opacity(0.2) : Color.clear)
         }
         .buttonStyle(.plain)
