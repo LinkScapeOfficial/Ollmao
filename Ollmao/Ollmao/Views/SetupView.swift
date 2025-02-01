@@ -252,8 +252,8 @@ struct SetupView: View {
             }
             .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity)
-        .padding(24)
+        .frame(width: 160)
+        .padding(20)
         .background(.quaternary)
         .cornerRadius(16)
     }
