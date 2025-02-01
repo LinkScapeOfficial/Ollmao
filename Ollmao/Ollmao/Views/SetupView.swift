@@ -78,7 +78,12 @@ struct SetupView: View {
                         Button {
                             previousStep = currentStep
                             withAnimation(.easeInOut) {
-                                currentStep += 1
+                                // Skip install models page if no models selected
+                                if currentStep == 2 && selectedModels.isEmpty {
+                                    currentStep += 2
+                                } else {
+                                    currentStep += 1
+                                }
                             }
                         } label: {
                             HStack {
