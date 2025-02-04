@@ -20,7 +20,7 @@
 
 ## Features
 
-- 🤖 Run AI models like Llama and DeepSeek locally
+- 🤖 Run AI models like LLaMA and DeepSeek locally
 - 🚀 Native macOS app with modern SwiftUI interface
 - 💬 Interactive chat interface
 - 🔄 Real-time streaming responses
