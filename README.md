@@ -18,6 +18,12 @@
 <img alt="License" src="https://img.shields.io/github/license/LinkScapeOfficial/Ollmao?label=License" height=22.5>
 </p>
 
+> [!WARNING]
+> Ollmao (**OH-luh-MAO**) is an independent open-source project that integrates with Ollama but is not affiliated with or endorsed by the Ollama team. The name is a playful reference to Ollama.  
+> 
+> For more information, see the original discussion with the Ollama author [here](https://github.com/LinkScapeOfficial/Ollmao/issues/2).  
+
+
 ## Features
 
 - 🤖 Run AI models like LLaMA and DeepSeek locally
