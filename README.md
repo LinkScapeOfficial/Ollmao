@@ -19,7 +19,7 @@
 </p>
 
 > [!NOTE]
-> Ollmao (**OH-luh-MAO**) is an independent open-source project that integrates with Ollama but is not affiliated with or endorsed by the Ollama team. The name is a playful reference to Ollama.  
+> Ollmao (**OH-luh-MAO**) is an open-source project that integrates with Ollama but is not affiliated with or endorsed by the Ollama team. The name is a playful reference of Ollama.  
 > 
 > For more information, see the original discussion with the Ollama author [here](https://github.com/LinkScapeOfficial/Ollmao/issues/2).  
 
