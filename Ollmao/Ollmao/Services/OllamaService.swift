@@ -6,18 +6,49 @@ actor OllamaService {
     
     private init() {}
     
-    private func formatContext(_ messages: [ChatMessage]) -> String {
-        let intro = "You are a helpful assistant, these are the content conversation the user discussed with assistant before.\n\n"
+    private struct Message: Codable {
+        let role: String
+        let content: String
+    }
+
+    private struct Context {
+        static let systemPrompt = """
+        You are an AI assistant in Ollmao, a modern and user-friendly Ollama GUI application developed by Zigao Wang and Thomas Wu. As Ollmao's assistant, you aim to:
+        - Provide clear, accurate, and helpful responses that reflect Ollmao's commitment to quality
+        - Maintain a friendly and approachable tone while being professional
+        - Help users understand and make the most of Ollmao's features
+        - Respect user privacy and data security
+        - Format responses in a clean, easy-to-read manner
+        - Admit when you're unsure and provide accurate information about Ollmao's capabilities
+        - Stay up-to-date with Ollama's features and limitations
+
+        Current conversation mode: chat
+        """
         
+        static let contextTemplate = """
+        [INST]
+        <<SYS>>
+        \(systemPrompt)
+        <</SYS>>
+        
+        {history}
+        
+        Human: {input}
+        [/INST]
+        """
+    }
+
+    private func formatContext(_ messages: [ChatMessage]) -> String {
         let history = messages.map { message in
             switch message.role {
                 case .user: return "Human: \(message.content)"
                 case .assistant: return "Assistant: \(message.content)"
-                case .system: return "System: \(message.content)"
+                case .system: return message.content // System messages are included directly
             }
-        }.joined(separator: "\n")
+        }.joined(separator: "\n\n")
         
-        return intro + history + "\n\nnow here is the new human prompt, please reply\n"
+        return Context.contextTemplate
+            .replacingOccurrences(of: "{history}", with: history)
     }
     
     private func cleanResponse(_ response: String) -> String {
@@ -34,19 +65,27 @@ actor OllamaService {
             throw URLError(.badURL)
         }
         
-        // Include previous messages in the prompt
-        let context = messages.isEmpty ? "" : formatContext(messages)
-        let fullPrompt = context + "Human: " + prompt
+        // Format the context with the template
+        let formattedContext = formatContext(messages)
+        let fullPrompt = formattedContext.replacingOccurrences(of: "{input}", with: prompt)
         
-        print("Full prompt being sent:")
-        print("---START OF PROMPT---")
-        print(fullPrompt)
-        print("---END OF PROMPT---")
+        if ProcessInfo.processInfo.environment["DEBUG"] != nil {
+            print("Full prompt being sent:")
+            print("---START OF PROMPT---")
+            print(fullPrompt)
+            print("---END OF PROMPT---")
+        }
         
         let body: [String: Any] = [
             "model": model,
             "prompt": fullPrompt,
-            "stream": true
+            "stream": true,
+            "options": [
+                "temperature": 0.7,
+                "top_p": 0.9,
+                "top_k": 40,
+                "repeat_penalty": 1.1
+            ]
         ]
         
         var request = URLRequest(url: url)
