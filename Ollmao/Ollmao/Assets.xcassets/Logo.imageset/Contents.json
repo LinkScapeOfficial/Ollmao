@@ -1,12 +1,12 @@
 {
   "images" : [
     {
-      "filename" : "512-mac.png",
+      "filename" : "1024x1024 no margin@1x.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "1024-mac 1.png",
+      "filename" : "1024x1024 no margin@2x.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
