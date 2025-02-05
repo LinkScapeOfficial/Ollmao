@@ -13,37 +13,30 @@ actor OllamaService {
 
     private struct Context {
         static let systemPrompt = """
-        You are an AI assistant in Ollmao, a modern and user-friendly Ollama GUI application developed by Zigao Wang and Thomas Wu. As Ollmao's assistant, you aim to:
-        - Provide clear, accurate, and helpful responses that reflect Ollmao's commitment to quality
-        - Maintain a friendly and approachable tone while being professional
-        - Help users understand and make the most of Ollmao's features
-        - Respect user privacy and data security
-        - Format responses in a clean, easy-to-read manner
-        - Admit when you're unsure and provide accurate information about Ollmao's capabilities
-        - Stay up-to-date with Ollama's features and limitations
-
-        Current conversation mode: chat
+        You are a helpful assistant. Be clear and direct in your responses.
         """
         
         static let contextTemplate = """
-        [INST]
-        <<SYS>>
+        [SYSTEM]
         \(systemPrompt)
-        <</SYS>>
+        [/SYSTEM]
         
         {history}
         
-        Human: {input}
-        [/INST]
+        [HUMAN]
+        {input}
+        [/HUMAN]
+        
+        [ASSISTANT]
         """
     }
 
     private func formatContext(_ messages: [ChatMessage]) -> String {
         let history = messages.map { message in
             switch message.role {
-                case .user: return "Human: \(message.content)"
-                case .assistant: return "Assistant: \(message.content)"
-                case .system: return message.content // System messages are included directly
+                case .user: return message.content
+                case .assistant: return message.content
+                case .system: return message.content
             }
         }.joined(separator: "\n\n")
         
@@ -52,12 +45,20 @@ actor OllamaService {
     }
     
     private func cleanResponse(_ response: String) -> String {
-        // Remove any "Assistant:" or "Human:" prefixes from the response
-        let cleaned = response.trimmingCharacters(in: .whitespacesAndNewlines)
-        if cleaned.lowercased().hasPrefix("assistant:") {
-            return String(cleaned.dropFirst("assistant:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        var cleaned = response.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Remove role tags and their content
+        let roleTags = ["[HUMAN]", "[ASSISTANT]", "[SYSTEM]"]
+        for tag in roleTags {
+            while let range = cleaned.range(of: "\\[\(tag)\\].*?\\[\\/\(tag)\\]", options: .regularExpression) {
+                cleaned.removeSubrange(range)
+            }
+            cleaned = cleaned.replacingOccurrences(of: tag, with: "")
+            cleaned = cleaned.replacingOccurrences(of: "[\(tag)]", with: "")
+            cleaned = cleaned.replacingOccurrences(of: "[/\(tag)]", with: "")
         }
-        return cleaned
+        
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     func generateResponse(prompt: String, messages: [ChatMessage], model: String) async throws -> AsyncThrowingStream<String, Error> {
